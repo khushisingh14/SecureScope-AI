@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<nmaprun scanner="nmap">
+  <host>
+    <address addr="10.10.10.25" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="22">
+        <state state="open"/>
+        <service name="ssh"/>
+      </port>
+      <port protocol="tcp" portid="21">
+        <state state="open"/>
+        <service name="ftp"/>
+        <script id="ftp-anon" output="Anonymous FTP login allowed. This configuration may expose sensitive files."/>
+      </port>
+      <port protocol="tcp" portid="445">
+        <state state="open"/>
+        <service name="smb"/>
+        <script id="smb-vuln-ms17-010" output="Host is likely VULNERABLE to MS17-010. CVE-2017-0144 indicators detected."/>
+      </port>
+    </ports>
+  </host>
+</nmaprun>

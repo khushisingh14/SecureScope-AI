@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<issues burpVersion="2024.1">
+  <issue>
+    <name>SQL injection</name>
+    <severity>High</severity>
+    <host>https://portal.example.com</host>
+    <path>/reports?id=42</path>
+    <issueDetail>The id parameter appears to be vulnerable to SQL injection based on database error responses.</issueDetail>
+    <remediationBackground>Use parameterized queries, avoid dynamic SQL construction, and add regression tests for injection payloads.</remediationBackground>
+    <references>https://portswigger.net/web-security/sql-injection</references>
+  </issue>
+  <issue>
+    <name>Missing Content Security Policy</name>
+    <severity>Low</severity>
+    <host>https://portal.example.com</host>
+    <path>/</path>
+    <issueDetail>The application does not define a Content-Security-Policy response header.</issueDetail>
+    <remediationBackground>Deploy a restrictive Content Security Policy and monitor violations before enforcing.</remediationBackground>
+  </issue>
+</issues>

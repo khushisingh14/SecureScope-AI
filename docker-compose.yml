@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: securescope
+      POSTGRES_USER: securescope
+      POSTGRES_PASSWORD: securescope
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U securescope -d securescope"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://securescope:securescope@postgres:5432/securescope
+      JWT_SECRET_KEY: replace-with-a-long-random-secret
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000/api
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

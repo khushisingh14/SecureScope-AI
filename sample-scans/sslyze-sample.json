@@ -1,0 +1,37 @@
+{
+  "server_scan_results": [
+    {
+      "server_location": {
+        "hostname": "vpn.example.com",
+        "port": 443
+      },
+      "scan_result": {
+        "certificate_info": {
+          "result": {
+            "certificate_deployments": [
+              {
+                "received_certificate_chain": [
+                  {
+                    "not_valid_after": "2026-08-15T00:00:00Z"
+                  }
+                ],
+                "path_validation_results": [
+                  {
+                    "was_validation_successful": false
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "tls_1_0_cipher_suites": {
+          "result": {
+            "accepted_cipher_suites": [
+              {"cipher_suite": {"name": "TLS_RSA_WITH_3DES_EDE_CBC_SHA"}}
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
