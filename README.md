@@ -11,14 +11,13 @@ SecureScope AI is a production-style full-stack cybersecurity assessment platfor
 
 ## Local Development
 
-Backend:
+Backend, from the repository root:
 
 ```bash
-cd backend
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
-copy .env.example .env
+pip install -r backend\requirements.txt
+copy backend\.env.example backend\.env
 python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 

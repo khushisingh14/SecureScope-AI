@@ -26,7 +26,7 @@ class Settings(BaseSettings):
         return value
 
     class Config:
-        env_file = ".env"
+        env_file = (".env", "backend/.env")
         case_sensitive = False
 
 

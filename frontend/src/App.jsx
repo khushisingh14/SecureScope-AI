@@ -6,6 +6,7 @@ import Findings from "./pages/Findings.jsx";
 import Reports from "./pages/Reports.jsx";
 import Scans from "./pages/Scans.jsx";
 import AppShell from "./components/AppShell.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth();
@@ -21,7 +22,9 @@ export default function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <AppShell />
+            <ErrorBoundary>
+              <AppShell />
+            </ErrorBoundary>
           </ProtectedRoute>
         }
       >

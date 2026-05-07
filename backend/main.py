@@ -1,16 +1,21 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .database import Base, engine
+from .errors import configure_error_handlers
 from .rate_limit import RateLimitMiddleware
 from .routers import ai, auth, dashboard, findings, reports, scans
 
 
 settings = get_settings()
+logging.basicConfig(level=logging.INFO if settings.environment == "development" else logging.WARNING)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
+configure_error_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,

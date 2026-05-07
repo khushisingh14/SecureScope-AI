@@ -1,6 +1,10 @@
 import httpx
+import logging
 
 from backend.config import get_settings
+
+
+logger = logging.getLogger("securescope.ai")
 
 
 class OpenRouterClient:
@@ -25,11 +29,15 @@ class OpenRouterClient:
             "HTTP-Referer": "https://securescope.local",
             "X-Title": "SecureScope AI",
         }
-        async with httpx.AsyncClient(base_url=str(self.settings.openrouter_base_url), timeout=30) as client:
-            response = await client.post("/chat/completions", json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip()
+        try:
+            async with httpx.AsyncClient(base_url=str(self.settings.openrouter_base_url), timeout=30) as client:
+                response = await client.post("/chat/completions", json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                return data["choices"][0]["message"]["content"].strip()
+        except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
+            logger.warning("OpenRouter request failed, using offline analysis: %s", exc)
+            return self._offline_response(user)
 
     def _offline_response(self, prompt: str) -> str:
         return (

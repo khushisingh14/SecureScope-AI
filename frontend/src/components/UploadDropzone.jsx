@@ -8,6 +8,13 @@ const scannerTypes = [
   { value: "sslyze", label: "SSLyze JSON" }
 ];
 
+function scannerFromFile(fileName = "") {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".json")) return "sslyze";
+  if (lower.endsWith(".txt") || lower.endsWith(".log")) return "nikto";
+  return null;
+}
+
 export default function UploadDropzone({ onUpload, loading }) {
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
@@ -15,9 +22,16 @@ export default function UploadDropzone({ onUpload, loading }) {
   const [name, setName] = useState("External Assessment");
   const [scope, setScope] = useState("Internet-facing infrastructure and web application security assessment.");
 
+  const chooseFile = (nextFile) => {
+    if (!nextFile) return;
+    setFile(nextFile);
+    const inferred = scannerFromFile(nextFile.name);
+    if (inferred) setScanner(inferred);
+  };
+
   const submit = (event) => {
     event.preventDefault();
-    if (!file) return;
+    if (!file || !onUpload) return;
     const form = new FormData();
     form.append("file", file);
     form.append("scanner_type", scanner);
@@ -33,14 +47,14 @@ export default function UploadDropzone({ onUpload, loading }) {
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
-          setFile(event.dataTransfer.files?.[0]);
+          chooseFile(event.dataTransfer.files?.[0]);
         }}
         className="grid cursor-pointer place-items-center rounded-lg border border-dashed border-cyan/35 bg-cyan/[0.04] px-4 py-10 text-center hover:bg-cyan/[0.07]"
       >
         <UploadCloud className="h-10 w-10 text-cyan" />
         <p className="mt-3 font-semibold text-slate-100">{file ? file.name : "Drop a scan file or browse"}</p>
         <p className="mt-1 text-sm text-slate-500">XML, TXT, LOG, and JSON scan exports are validated before parsing.</p>
-        <input ref={inputRef} type="file" className="hidden" onChange={(event) => setFile(event.target.files?.[0])} />
+        <input ref={inputRef} type="file" className="hidden" onChange={(event) => chooseFile(event.target.files?.[0])} />
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">

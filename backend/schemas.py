@@ -53,7 +53,7 @@ class ScanRead(BaseModel):
     scope: str
     risk_score: float
     created_at: datetime
-    findings: list[FindingRead] = []
+    findings: list[FindingRead] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

@@ -1,4 +1,7 @@
+import logging
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from backend.config import get_settings
@@ -6,22 +9,36 @@ from backend.database import get_db
 from backend.dependencies import get_current_user
 from backend.models import Finding, Scan, User
 from backend.parsers import PARSERS
+from backend.parsers.common import coerce_finding
 from backend.schemas import ScanRead
 from backend.services.sanitizer import safe_filename
 from backend.services.scoring import finding_priority, posture_score
 
 
 router = APIRouter()
+logger = logging.getLogger("securescope.scans")
 ALLOWED_EXTENSIONS = {
     "nmap": {".xml"},
     "burp": {".xml"},
     "nikto": {".txt", ".log"},
     "sslyze": {".json"},
 }
+SCANNER_ALIASES = {
+    "burp suite": "burp",
+    "burpsuite": "burp",
+    "nmap xml": "nmap",
+    "nikto txt": "nikto",
+    "sslyze json": "sslyze",
+}
 
 
 def _extension(filename: str) -> str:
     return "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+
+def _scanner(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    return SCANNER_ALIASES.get(normalized, normalized)
 
 
 @router.get("", response_model=list[ScanRead])
@@ -45,56 +62,61 @@ async def upload_scan(
     db: Session = Depends(get_db),
 ):
     settings = get_settings()
-    scanner = scanner_type.lower()
-    print(f"DEBUG: Received upload - scanner_type={scanner_type}, scanner={scanner}, filename={file.filename}")
+    scanner = _scanner(scanner_type)
     if scanner not in PARSERS:
         raise HTTPException(status_code=400, detail="Unsupported scanner type")
     if _extension(file.filename or "") not in ALLOWED_EXTENSIONS[scanner]:
         raise HTTPException(status_code=400, detail="File extension does not match scanner type")
+    clean_name = (name or "").strip()[:255] or f"{scanner.upper()} scan"
 
     content = await file.read()
-    print(f"DEBUG: File size={len(content)} bytes")
     if len(content) > settings.max_upload_mb * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Upload exceeds size limit")
     if not content.strip():
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
     try:
-        parsed = PARSERS[scanner](content)
-        print(f"DEBUG: Parser returned {len(parsed)} findings")
+        parsed = [coerce_finding(item, scanner) for item in PARSERS[scanner](content)]
     except Exception as exc:
-        print(f"DEBUG: Parser error - {exc}")
+        logger.info("Parser failed for scanner=%s filename=%s: %s", scanner, file.filename, exc)
         raise HTTPException(status_code=400, detail=f"Could not parse scan file: {exc}") from exc
 
     scan = Scan(
-        name=name.strip()[:255],
+        name=clean_name,
         scanner_type=scanner,
         filename=safe_filename(file.filename or "scan"),
         scope=scope.strip()[:4000],
         user_id=current_user.id,
     )
-    db.add(scan)
-    db.flush()
+    try:
+        db.add(scan)
+        db.flush()
 
-    findings = []
-    for item in parsed:
-        finding = Finding(
-            scan_id=scan.id,
-            title=item["title"],
-            severity=item["severity"],
-            description=item["description"],
-            affected_host=item["affected_host"],
-            remediation=item["remediation"],
-            references=item["references"],
-            source=item["source"],
-            priority=finding_priority(item["severity"]),
-        )
-        findings.append(finding)
-        db.add(finding)
+        findings = []
+        for item in parsed:
+            finding = Finding(
+                scan_id=scan.id,
+                title=item["title"],
+                severity=item["severity"],
+                description=item["description"],
+                affected_host=item["affected_host"],
+                remediation=item["remediation"],
+                references=item["references"],
+                source=item["source"],
+                priority=finding_priority(item["severity"]),
+            )
+            findings.append(finding)
+            db.add(finding)
 
-    scan.risk_score = posture_score(findings)
-    db.commit()
-    db.refresh(scan)
+        scan.risk_score = posture_score(findings)
+        db.commit()
+        db.refresh(scan)
+        scan.findings = findings
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+
+    logger.info("Imported scan id=%s scanner=%s findings=%s", scan.id, scanner, len(parsed))
     return scan
 
 

@@ -22,4 +22,16 @@ api.interceptors.response.use(
   }
 );
 
+export function getApiError(error, fallback = "Request failed") {
+  const detail = error?.response?.data?.detail;
+  if (Array.isArray(detail)) return detail.map((item) => item.msg || item.message || String(item)).join(", ");
+  if (detail) return String(detail);
+  if (error?.message) return error.message;
+  return fallback;
+}
+
+export function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 export default api;

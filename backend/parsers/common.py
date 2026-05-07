@@ -41,3 +41,19 @@ def finding(
         references=references,
         source=source,
     ).to_dict()
+
+
+def coerce_finding(item: dict | None, source: str) -> dict:
+    item = item or {}
+    title = clean_text(item.get("title") or f"{source} finding", 500)
+    affected_host = clean_text(item.get("affected_host") or item.get("host") or "unknown-host", 255)
+    description = clean_text(item.get("description") or "Scanner reported a finding without additional detail.")
+    return finding(
+        title=title,
+        severity=normalize_severity(item.get("severity")),
+        description=description,
+        affected_host=affected_host,
+        remediation=item.get("remediation") or "Review the finding, validate exposure, and remediate according to vendor guidance.",
+        references=item.get("references") or "",
+        source=item.get("source") or source,
+    )

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, FileSearch, Radar, ShieldCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import api from "../api/client";
+import api, { asArray, getApiError } from "../api/client";
 import FindingTable from "../components/FindingTable.jsx";
 import RiskMeter from "../components/RiskMeter.jsx";
 import StatCard from "../components/StatCard.jsx";
+import UploadDropzone from "../components/UploadDropzone.jsx";
 
 const severityColors = {
   Critical: "#FB7185",
@@ -18,11 +19,24 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [findings, setFindings] = useState([]);
   const [analysis, setAnalysis] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   const load = async () => {
-    const [dashboard, findingList] = await Promise.all([api.get("/dashboard"), api.get("/findings?sort=severity&direction=desc")]);
-    setStats(dashboard.data);
-    setFindings(findingList.data.slice(0, 8));
+    setError("");
+    try {
+      const [dashboard, findingList] = await Promise.all([api.get("/dashboard"), api.get("/findings?sort=severity&direction=desc")]);
+      setStats(dashboard.data && typeof dashboard.data === "object" ? dashboard.data : null);
+      setFindings(asArray(findingList.data).slice(0, 8));
+    } catch (err) {
+      setError(getApiError(err, "Could not load dashboard data"));
+      setStats(null);
+      setFindings([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -31,8 +45,27 @@ export default function Dashboard() {
 
   const analyze = async (finding) => {
     setAnalysis("Generating AI analyst note...");
-    const response = await api.post("/ai/analyze", { finding_id: finding.id });
-    setAnalysis(response.data.analysis);
+    try {
+      const response = await api.post("/ai/analyze", { finding_id: finding.id });
+      setAnalysis(response.data?.analysis || "No analysis was returned.");
+    } catch (err) {
+      setAnalysis(getApiError(err, "AI analysis failed"));
+    }
+  };
+
+  const upload = async (form) => {
+    setUploading(true);
+    setMessage("");
+    try {
+      const response = await api.post("/scans/upload", form);
+      const count = asArray(response.data?.findings).length;
+      setMessage(`Imported ${count} findings from ${response.data?.filename || "scan file"}`);
+      await load();
+    } catch (err) {
+      setMessage(getApiError(err, "Upload failed"));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const severityData = Object.entries(stats?.severity_counts || {}).map(([name, value]) => ({ name, value }));
@@ -46,6 +79,8 @@ export default function Dashboard() {
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white md:text-4xl">Security posture dashboard</h1>
         </div>
       </div>
+      {error && <p className="rounded-lg border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-rose-200">{error}</p>}
+      {loading && <p className="rounded-lg border border-line bg-white/[0.03] px-4 py-3 text-sm text-slate-300">Loading dashboard data...</p>}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Scans imported" value={stats?.scan_count ?? 0} detail="Historical scanner evidence" icon={Radar} tone="cyan" />
@@ -53,6 +88,9 @@ export default function Dashboard() {
         <StatCard title="Posture score" value={stats?.posture_score ?? 100} detail="Weighted by severity" icon={ShieldCheck} tone="mint" />
         <StatCard title="Critical/High" value={(stats?.severity_counts?.Critical ?? 0) + (stats?.severity_counts?.High ?? 0)} detail="Needs rapid triage" icon={AlertTriangle} tone="danger" />
       </div>
+
+      <UploadDropzone onUpload={upload} loading={uploading} />
+      {message && <p className="rounded-lg border border-line bg-white/[0.03] px-4 py-3 text-sm text-slate-300">{message}</p>}
 
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <RiskMeter score={stats?.posture_score ?? 100} />

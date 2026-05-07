@@ -1,18 +1,29 @@
 import { useEffect, useState } from "react";
-import api from "../api/client";
+import api, { asArray, getApiError } from "../api/client";
 import FindingTable from "../components/FindingTable.jsx";
 
 export default function Findings() {
   const [findings, setFindings] = useState([]);
   const [filters, setFilters] = useState({ search: "", severity: "", source: "", direction: "desc" });
   const [analysis, setAnalysis] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
+    setLoading(true);
+    setError("");
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => value && params.append(key, value));
     params.append("sort", "severity");
-    const response = await api.get(`/findings?${params.toString()}`);
-    setFindings(response.data);
+    try {
+      const response = await api.get(`/findings?${params.toString()}`);
+      setFindings(asArray(response.data));
+    } catch (err) {
+      setFindings([]);
+      setError(getApiError(err, "Could not load findings"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -21,8 +32,12 @@ export default function Findings() {
 
   const analyze = async (finding) => {
     setAnalysis("Generating AI analyst note...");
-    const response = await api.post("/ai/analyze", { finding_id: finding.id });
-    setAnalysis(response.data.analysis);
+    try {
+      const response = await api.post("/ai/analyze", { finding_id: finding.id });
+      setAnalysis(response.data?.analysis || "No analysis was returned.");
+    } catch (err) {
+      setAnalysis(getApiError(err, "AI analysis failed"));
+    }
   };
 
   return (
@@ -31,6 +46,8 @@ export default function Findings() {
         <p className="text-sm font-bold uppercase tracking-[0.28em] text-cyan">Risk register</p>
         <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white">Findings triage</h1>
       </div>
+      {error && <p className="rounded-lg border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-rose-200">{error}</p>}
+      {loading && <p className="rounded-lg border border-line bg-white/[0.03] px-4 py-3 text-sm text-slate-300">Loading findings...</p>}
       <div className="glass grid gap-3 rounded-lg p-4 md:grid-cols-4">
         <input placeholder="Search findings" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} className="rounded-lg border border-line bg-slate-950/70 px-3 py-3 text-sm outline-none focus:border-cyan/50 md:col-span-2" />
         <select value={filters.severity} onChange={(e) => setFilters({ ...filters, severity: e.target.value })} className="rounded-lg border border-line bg-slate-950/70 px-3 py-3 text-sm outline-none focus:border-cyan/50">
